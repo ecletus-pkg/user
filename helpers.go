@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"git.moisespsena.com/moisespsena/sam/app/models"
-	"github.com/aghape/core"
 	"github.com/aghape/auth"
 	"github.com/aghape/auth/auth_identity"
 	"github.com/aghape/auth/providers/password"
+	"github.com/aghape/core"
 	"github.com/aghape/media"
 	"github.com/aghape/notification"
 	"github.com/moisespsena/go-default-logger"
@@ -31,7 +30,7 @@ func CreateAdminUserIfNotExists(site core.SiteInterface, Auth *auth.Auth, Notifi
 		if err != nil {
 			return errwrap.Wrap(err, "Read admin user mail")
 		}
-		AdminUser := &models.User{Email: email}
+		AdminUser := &User{Email: email}
 		AdminUser.SystemAdmin()
 		err = DB.Create(AdminUser).Error
 		if err != nil {

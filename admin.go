@@ -1,7 +1,6 @@
 package user
 
 import (
-	"git.moisespsena.com/moisespsena/sam/app/models"
 	"github.com/aghape/admin"
 	"github.com/aghape/core"
 	"github.com/aghape/core/resource"
@@ -30,7 +29,7 @@ func (p *Plugin) userSetup(res *admin.Resource, options *plug.Options) {
 						context.DB.AddError(validations.Failed(res, "Password", "Can't encrpt password"))
 						return nil
 					}
-					u := resource.(*models.User)
+					u := resource.(*User)
 					u.Password = string(bcryptPassword)
 				}
 			}
@@ -38,10 +37,10 @@ func (p *Plugin) userSetup(res *admin.Resource, options *plug.Options) {
 		},
 	})
 	res.Meta(&admin.Meta{Name: "Confirmed", Valuer: func(user interface{}, ctx *core.Context) interface{} {
-		if user.(*models.User).ID == 0 {
+		if user.(*User).ID == 0 {
 			return true
 		}
-		return user.(*models.User).Confirmed
+		return user.(*User).Confirmed
 	}})
 
 	res.Filter(&admin.Filter{
