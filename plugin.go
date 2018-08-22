@@ -6,7 +6,7 @@ import (
 
 	"github.com/aghape/admin"
 	"github.com/aghape/admin/adminplugin"
-	"github.com/aghape/aghape"
+	"github.com/aghape/core"
 	"github.com/aghape/auth"
 	"github.com/aghape/auth/auth_identity"
 	"github.com/aghape/auth/providers/password"
@@ -54,13 +54,13 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 	})
 
 	cli.OnRegister(p, func(e *cli.RegisterEvent) {
-		SitesReader := e.Options().GetInterface(p.SitesReaderKey).(qor.SitesReaderInterface)
+		SitesReader := e.Options().GetInterface(p.SitesReaderKey).(core.SitesReaderInterface)
 		cmd := &sites.CmdUtils{SitesReader: SitesReader}
 		var rupCmd = cmd.Sites(&cobra.Command{
 			Use:   "user-password-reset NAME",
 			Short: "Reset the user password",
 			Args:  cobra.ExactArgs(1),
-		}, func(cmd *cobra.Command, site qor.SiteInterface, args []string) (err error) {
+		}, func(cmd *cobra.Command, site core.SiteInterface, args []string) (err error) {
 			name := args[0]
 			if name == "" {
 				return fmt.Errorf("User name is empty.")

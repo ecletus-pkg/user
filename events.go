@@ -1,7 +1,7 @@
 package user
 
 import (
-	"github.com/aghape/aghape"
+	"github.com/aghape/core"
 	"github.com/aghape/plug"
 )
 
@@ -9,7 +9,7 @@ var E_REGISTER_USER = PKG + ".register_user"
 
 type RegisterUserEvent struct {
 	plug.PluginEventInterface
-	Site qor.SiteInterface
+	Site core.SiteInterface
 }
 
 type events struct {
@@ -34,6 +34,6 @@ func Trigger(d plug.PluginEventDispatcherInterface) *trigger {
 	return &trigger{d}
 }
 
-func (d *trigger) RegisterUsers(site qor.SiteInterface) error {
+func (d *trigger) RegisterUsers(site core.SiteInterface) error {
 	return d.d.Trigger(&RegisterUserEvent{plug.NewPluginEvent(E_REGISTER_USER + ":" + site.Name()), site})
 }

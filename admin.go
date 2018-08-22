@@ -3,8 +3,8 @@ package user
 import (
 	"git.moisespsena.com/moisespsena/sam/app/models"
 	"github.com/aghape/admin"
-	"github.com/aghape/aghape"
-	"github.com/aghape/aghape/resource"
+	"github.com/aghape/core"
+	"github.com/aghape/core/resource"
 	"github.com/aghape/plug"
 	"github.com/aghape/validations"
 	"golang.org/x/crypto/bcrypt"
@@ -20,8 +20,8 @@ func (p *Plugin) userSetup(res *admin.Resource, options *plug.Options) {
 	res.Meta(&admin.Meta{
 		Name:            "Password",
 		Type:            "password",
-		FormattedValuer: func(interface{}, *qor.Context) interface{} { return "" },
-		Setter: func(resource interface{}, metaValue *resource.MetaValue, context *qor.Context) error {
+		FormattedValuer: func(interface{}, *core.Context) interface{} { return "" },
+		Setter: func(resource interface{}, metaValue *resource.MetaValue, context *core.Context) error {
 			values := metaValue.Value.([]string)
 			if len(values) > 0 {
 				if newPassword := values[0]; newPassword != "" {
@@ -37,7 +37,7 @@ func (p *Plugin) userSetup(res *admin.Resource, options *plug.Options) {
 			return nil
 		},
 	})
-	res.Meta(&admin.Meta{Name: "Confirmed", Valuer: func(user interface{}, ctx *qor.Context) interface{} {
+	res.Meta(&admin.Meta{Name: "Confirmed", Valuer: func(user interface{}, ctx *core.Context) interface{} {
 		if user.(*models.User).ID == 0 {
 			return true
 		}

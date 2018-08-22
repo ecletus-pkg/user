@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"git.moisespsena.com/moisespsena/sam/app/models"
-	"github.com/aghape/aghape"
+	"github.com/aghape/core"
 	"github.com/aghape/auth"
 	"github.com/aghape/auth/auth_identity"
 	"github.com/aghape/auth/providers/password"
@@ -20,7 +20,7 @@ var log = defaultlogger.NewLogger(path_helpers.GetCalledDir())
 
 const DEFAULT_PASSWORD = "123456"
 
-func CreateAdminUserIfNotExists(site qor.SiteInterface, Auth *auth.Auth, Notification *notification.Notification,
+func CreateAdminUserIfNotExists(site core.SiteInterface, Auth *auth.Auth, Notification *notification.Notification,
 	readEmail func() (string, error)) (err error) {
 	var adminUser User
 	DB := media.IgnoreCallback(site.GetSystemDB().DB)
@@ -63,7 +63,7 @@ func CreateAdminUserIfNotExists(site qor.SiteInterface, Auth *auth.Auth, Notific
 			Title:       "Welcome!",
 			Body:        "Welcome!",
 			MessageType: "info",
-		}, &qor.Context{DB: DB})
+		}, &core.Context{DB: DB})
 	}
 	return nil
 }
