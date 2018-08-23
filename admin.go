@@ -37,7 +37,7 @@ func (p *Plugin) userSetup(res *admin.Resource, options *plug.Options) {
 		},
 	})
 	res.Meta(&admin.Meta{Name: "Confirmed", Valuer: func(user interface{}, ctx *core.Context) interface{} {
-		if user.(*User).ID == 0 {
+		if user.(*User).ID == "" {
 			return true
 		}
 		return user.(*User).Confirmed

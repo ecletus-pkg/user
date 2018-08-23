@@ -24,7 +24,7 @@ func CreateAdminUserIfNotExists(site core.SiteInterface, Auth *auth.Auth, Notifi
 	var adminUser User
 	DB := media.IgnoreCallback(site.GetSystemDB().DB)
 	DB.First(&adminUser, "name = ?", "admin")
-	if adminUser.ID == 0 {
+	if adminUser.ID == "" {
 		log.Info("Create System Administrator user")
 		email, err := readEmail()
 		if err != nil {

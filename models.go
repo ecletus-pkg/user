@@ -3,8 +3,6 @@ package user
 import (
 	"time"
 
-	"strconv"
-
 	"github.com/aghape-pkg/people"
 	"github.com/aghape/fragment"
 	"github.com/aghape/media"
@@ -36,15 +34,6 @@ type User struct {
 	systemAdmin   bool
 
 	People people.People
-}
-
-func (user *User) SetID(v string) {
-	i, _ := strconv.Atoi(v)
-	user.ID = uint(i)
-}
-
-func (user *User) GetID() string {
-	return strconv.Itoa(int(user.ID))
 }
 
 func (user *User) SystemAdmin() {
