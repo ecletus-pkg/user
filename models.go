@@ -14,7 +14,7 @@ import (
 )
 
 type User struct {
-	aorm.Model
+	aorm.AuditedModel
 	fragment.FragmentedModel
 	Email    string `form:"email"`
 	Password string
