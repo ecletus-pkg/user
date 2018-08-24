@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"syscall"
 
+	"github.com/aghape-pkg/admin"
 	"github.com/aghape/admin"
-	"github.com/aghape/admin/adminplugin"
-	"github.com/aghape/core"
 	"github.com/aghape/auth"
 	"github.com/aghape/auth/auth_identity"
 	"github.com/aghape/auth/providers/password"
 	"github.com/aghape/cli"
+	"github.com/aghape/core"
 	"github.com/aghape/db"
 	"github.com/aghape/helpers"
 	"github.com/aghape/plug"
@@ -27,7 +27,7 @@ var (
 type Plugin struct {
 	plug.EventDispatcher
 	db.DBNames
-	adminplugin.AdminNames
+	admin_plugin.AdminNames
 	SitesReaderKey, AuthKey string
 }
 
@@ -38,7 +38,8 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 	if p.AuthKey == "" {
 		panic("AuthKey is BLANK")
 	}
-	p.AdminNames.OnInitResources(p, func(e *adminplugin.AdminEvent) {
+
+	admin_plugin.Events(p).InitResources(func(e *admin_plugin.AdminEvent) {
 		menu := options.GetStrings(USER_MENU)
 		e.Admin.AddResource(&User{}, &admin.Config{Setup: func(res *admin.Resource) {
 			p.userSetup(res, options)
