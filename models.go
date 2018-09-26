@@ -5,7 +5,6 @@ import (
 
 	"github.com/aghape-pkg/people"
 	"github.com/aghape/fragment"
-	"github.com/aghape/media"
 	"github.com/aghape/media/oss"
 	"github.com/aghape/validations"
 	"github.com/moisespsena-go/aorm"
@@ -66,8 +65,8 @@ func (user *User) Validate(db *aorm.DB) {
 
 type AvatarImageStorage struct{ oss.OSS }
 
-func (AvatarImageStorage) GetSizes() map[string]*media.Size {
-	return map[string]*media.Size{
+func (AvatarImageStorage) GetSizes() map[string]*oss.Size {
+	return map[string]*oss.Size{
 		"small":  {Width: 50, Height: 50},
 		"middle": {Width: 120, Height: 120},
 		"big":    {Width: 320, Height: 320},

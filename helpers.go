@@ -8,7 +8,7 @@ import (
 	"github.com/aghape/auth/auth_identity"
 	"github.com/aghape/auth/providers/password"
 	"github.com/aghape/core"
-	"github.com/aghape/media"
+	"github.com/aghape/media/oss"
 	"github.com/aghape/notification"
 	"github.com/moisespsena/go-default-logger"
 	"github.com/moisespsena/go-error-wrap"
@@ -22,7 +22,7 @@ const DEFAULT_PASSWORD = "123456"
 func CreateAdminUserIfNotExists(site core.SiteInterface, Auth *auth.Auth, Notification *notification.Notification,
 	readEmail func() (string, error)) (err error) {
 	var adminUser User
-	DB := media.IgnoreCallback(site.GetSystemDB().DB)
+	DB := oss.IgnoreCallback(site.GetSystemDB().DB)
 	DB.First(&adminUser, "name = ?", "admin")
 	if adminUser.ID == "" {
 		log.Info("Create System Administrator user")

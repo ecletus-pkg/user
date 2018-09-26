@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"syscall"
 
+	"github.com/moisespsena-go/aorm"
+
 	"github.com/aghape-pkg/admin"
 	"github.com/aghape/admin"
 	"github.com/aghape/auth"
@@ -46,11 +48,11 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 		}, Menu: menu})
 	})
 
-	db.Events(p).DBOnMigrateGorm(func(e *db.GormDBEvent) error {
+	db.Events(p).DBOnMigrate(func(e *db.DBEvent) error {
 		return helpers.CheckReturnE(func() (key string, err error) {
-			return "Migrate", e.DB.AutoMigrate(&User{}).Error
+			return "Migrate", e.AutoMigrate(&User{}).Error
 		}, func() (key string, err error) {
-			return "Create Index", e.DB.Model(&User{}).AddUniqueIndex("idx_user_name", "name").Error
+			return "Create Index", e.Model(&User{}).AddUniqueIndex("idx_user_name", "name").Error
 		})
 	})
 
@@ -74,10 +76,12 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 
 				identity := &auth_identity.AuthIdentity{}
 				DB := site.GetDB(dbName)
-				DB.DB.Find(identity, "uid = ?", name)
 
-				if identity.ID == 0 {
-					log.Infof("Site %q, DB %q: Usuário %q não exists.", site.Name(), dbName, name)
+				if err = DB.DB.Find(identity, "uid = ?", name).Error; err != nil {
+					if aorm.IsRecordNotFoundError(err) {
+						err = fmt.Errorf("Site %q, DB %q: Usuário %q não exists.", site.Name(), dbName, name)
+					}
+					return
 				}
 
 				provider := Auth.GetProvider("password").(*password.Provider)
