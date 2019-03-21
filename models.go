@@ -4,10 +4,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/qor/roles"
-
 	"github.com/ecletus/fragment"
 	"github.com/ecletus/media/oss"
+	"github.com/ecletus/roles"
 	"github.com/ecletus/validations"
 	"github.com/moisespsena-go/aorm"
 )
