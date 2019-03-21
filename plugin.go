@@ -15,6 +15,7 @@ import (
 	"github.com/aghape/core"
 	"github.com/aghape/db"
 	"github.com/aghape/helpers"
+	"github.com/aghape/notification"
 	"github.com/aghape/plug"
 	"github.com/aghape/sites"
 	"github.com/moisespsena/go-error-wrap"
@@ -26,11 +27,19 @@ var (
 	USER_MENU = PKG + ".userMenu"
 )
 
+type Config struct {
+	CreateRole string
+	DeleteRole string
+	UpdateRole string
+	ReadRole   string
+}
+
 type Plugin struct {
 	plug.EventDispatcher
 	db.DBNames
 	admin_plugin.AdminNames
-	SitesReaderKey, AuthKey string
+	SitesReaderKey, NotificationKey, AuthKey, RolesKey string
+	Config                                             Config
 }
 
 func (p *Plugin) OnRegister(options *plug.Options) {
@@ -41,11 +50,37 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 		panic("AuthKey is BLANK")
 	}
 
+	if p.Config.CreateRole == "" {
+		p.Config.CreateRole = admin.ROLE
+	}
+
+	if p.Config.ReadRole == "" {
+		p.Config.ReadRole = admin.ROLE
+	}
+
+	if p.Config.UpdateRole == "" {
+		p.Config.UpdateRole = admin.ROLE
+	}
+
+	if p.Config.DeleteRole == "" {
+		p.Config.DeleteRole = admin.ROLE
+	}
+
 	admin_plugin.Events(p).InitResources(func(e *admin_plugin.AdminEvent) {
 		menu := options.GetStrings(USER_MENU)
-		e.Admin.AddResource(&User{}, &admin.Config{Setup: func(res *admin.Resource) {
-			p.userSetup(res, options)
+		n := options.GetInterface(p.NotificationKey).(*notification.Notification)
+		res := e.Admin.AddResource(&User{}, &admin.Config{Setup: func(res *admin.Resource) {
+			p.userSetup(res, options, n)
 		}, Menu: menu})
+
+		res.AddResource(&admin.SubConfig{}, &SetPassword{}, &admin.Config{
+			Singleton:  true,
+			Controller: &SetPasswordController{res, n},
+			Setup: func(pres *admin.Resource) {
+				p.passwordSetup(res, pres, n)
+			},
+		})
+
 	})
 
 	db.Events(p).DBOnMigrate(func(e *db.DBEvent) error {
@@ -70,56 +105,63 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 			}
 
 			Auth := options.GetInterface(p.AuthKey).(*auth.Auth)
+			DB := site.GetSystemDB().DB
+			log.Infof("Site %q: Redefinindo a senha do usuário %q.", site.Name(), name)
 
-			for _, dbName := range p.DBNames.GetNames() {
-				log.Infof("Site %q, DB %q: Redefinindo a senha do usuário %q.", site.Name(), dbName, name)
+			provider := Auth.GetProvider("password").(*password.Provider)
 
-				identity := &auth_identity.AuthIdentity{}
-				DB := site.GetDB(dbName)
-
-				if err = DB.DB.Find(identity, "uid = ?", name).Error; err != nil {
-					if aorm.IsRecordNotFoundError(err) {
-						err = fmt.Errorf("Site %q, DB %q: Usuário %q não exists.", site.Name(), dbName, name)
-					}
-					return
+			var user User
+			if err = DB.First(&user, "email = ?", name).Error; err != nil {
+				if aorm.IsRecordNotFoundError(err) {
+					return fmt.Errorf("User does not exists.")
 				}
+				return errwrap.Wrap(err, "Find user")
+			}
 
-				provider := Auth.GetProvider("password").(*password.Provider)
+			var (
+				passwd     string
+				readPasswd bool
+			)
 
-				var (
-					passwd     string
-					readPasswd bool
-				)
-
-				if readPasswd, err = cmd.Flags().GetBool("read-password"); err != nil {
-					return fmt.Errorf("Read-Password flag failed.")
+			if readPasswd, err = cmd.Flags().GetBool("read-password"); err != nil {
+				return fmt.Errorf("Read-Password flag failed.")
+			}
+			if readPasswd {
+				fmt.Print("Your password: ")
+				bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+				if err != nil {
+					return errwrap.Wrap(err, "Read Password")
 				}
-				if readPasswd {
-					fmt.Print("Your password: ")
-					bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-					if err != nil {
-						return errwrap.Wrap(err, "Read Password")
-					}
-					passwd = string(bytePassword)
-					fmt.Println() // it's necessary to add a new line after user's input
-				} else {
-					if passwd, err = cmd.Flags().GetString("password"); err != nil {
-						return fmt.Errorf("Password flag failed.")
-					}
+				passwd = string(bytePassword)
+				fmt.Println() // it's necessary to add a new line after user's input
+			} else {
+				if passwd, err = cmd.Flags().GetString("password"); err != nil {
+					return fmt.Errorf("Password flag failed.")
 				}
+			}
 
-				if passwd == "" {
-					return fmt.Errorf("Password is blank.")
-				}
+			if passwd == "" {
+				return fmt.Errorf("Password is blank.")
+			}
 
-				hashedPassword, _ := provider.Encryptor.Digest(passwd)
-				identity.EncryptedPassword = hashedPassword
+			updater := password.PasswordUpdater{
+				UID:                     user.GetEmail(),
+				UserID:                  user.GetID(),
+				Provider:                provider,
+				DB:                      DB,
+				NewPassword:             passwd,
+				PasswordConfirm:         passwd,
+				CurrentPasswordDisabled: true,
+				Confirmed:               true,
+				Createable:              true,
+				AuthIdentityModel:       &auth_identity.AuthIdentity{},
+				T: func(key string, defaul ...interface{}) string {
+					return key
+				},
+			}
 
-				if err = DB.DB.Save(identity).Error; err != nil {
-					return errwrap.Wrap(err, "Save on DB")
-				}
-
-				log.Infof("Site %q, DB %q: Usuário %q done.", site.Name(), dbName, name)
+			if err = updater.Update(); err != nil {
+				return err
 			}
 			return nil
 		})

@@ -2,3 +2,19 @@ User:
   label*:
     s: Usuário
     p: Usuários
+  attributes:
+    Confirmed: Confirmado
+    Name: Nome de Usuário
+    AdvancedRolesString: Papéis Avançados
+    Role: Papel
+  form:
+    sections:
+      Basic Information: Informações Básicas
+
+SetPassword:
+  label*:
+    s: Alterar Senha
+  attributes:
+    YourPassword: Sua senha
+    NewPassword: Nova senha
+    PasswordConfirm: Confirme a nova senha
