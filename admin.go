@@ -4,13 +4,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/aghape/core/resource"
+	"github.com/ecletus/core/resource"
 
-	"github.com/aghape/admin"
-	"github.com/aghape/core"
-	"github.com/aghape/notification"
-	"github.com/aghape/plug"
-	"github.com/aghape/roles"
+	"github.com/ecletus/admin"
+	"github.com/ecletus/core"
+	"github.com/ecletus/notification"
+	"github.com/ecletus/plug"
+	"github.com/ecletus/roles"
 )
 
 func (p *Plugin) userSetup(res *admin.Resource, options *plug.Options, Notification *notification.Notification) {

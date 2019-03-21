@@ -1,14 +1,14 @@
 package user
 
 import (
-	"github.com/aghape/common"
+	"github.com/ecletus/common"
 
-	"github.com/aghape/auth"
-	"github.com/aghape/auth/auth_identity"
-	"github.com/aghape/auth/providers/password"
-	"github.com/aghape/core"
-	"github.com/aghape/media/oss"
-	"github.com/aghape/notification"
+	"github.com/ecletus/auth"
+	"github.com/ecletus/auth/auth_identity"
+	"github.com/ecletus/auth/providers/password"
+	"github.com/ecletus/core"
+	"github.com/ecletus/media/oss"
+	"github.com/ecletus/notification"
 	"github.com/moisespsena-go/aorm"
 	"github.com/moisespsena/go-default-logger"
 	"github.com/moisespsena/go-error-wrap"

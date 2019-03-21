@@ -1,8 +1,8 @@
 package user
 
 import (
-	"github.com/aghape/core"
-	"github.com/aghape/plug"
+	"github.com/ecletus/core"
+	"github.com/ecletus/plug"
 )
 
 var E_REGISTER_USER = PKG + ".register_user"

@@ -6,9 +6,9 @@ import (
 
 	"github.com/qor/roles"
 
-	"github.com/aghape/fragment"
-	"github.com/aghape/media/oss"
-	"github.com/aghape/validations"
+	"github.com/ecletus/fragment"
+	"github.com/ecletus/media/oss"
+	"github.com/ecletus/validations"
 	"github.com/moisespsena-go/aorm"
 )
 

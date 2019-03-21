@@ -1,2 +1,2 @@
 # user
-User resources for https://github.com/aghape framework
+User resources for https://github.com/ecletus framework

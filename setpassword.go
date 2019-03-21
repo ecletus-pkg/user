@@ -3,13 +3,13 @@ package user
 import (
 	"errors"
 
-	"github.com/aghape/auth"
+	"github.com/ecletus/auth"
 
-	"github.com/aghape/auth/auth_identity"
-	"github.com/aghape/auth/providers/password"
+	"github.com/ecletus/auth/auth_identity"
+	"github.com/ecletus/auth/providers/password"
 
-	"github.com/aghape/admin"
-	"github.com/aghape/notification"
+	"github.com/ecletus/admin"
+	"github.com/ecletus/notification"
 )
 
 type SetPasswordController struct {
