@@ -18,7 +18,7 @@ import (
 	"github.com/ecletus/notification"
 	"github.com/ecletus/plug"
 	"github.com/ecletus/sites"
-	"github.com/moisespsena/go-error-wrap"
+	"github.com/moisespsena-go/error-wrap"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 )
