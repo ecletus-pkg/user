@@ -10,9 +10,9 @@ import (
 	"github.com/ecletus/media/oss"
 	"github.com/ecletus/notification"
 	"github.com/moisespsena-go/aorm"
-	"github.com/moisespsena/go-default-logger"
+	"github.com/moisespsena-go/default-logger"
 	"github.com/moisespsena/go-error-wrap"
-	"github.com/moisespsena/go-path-helpers"
+	"github.com/moisespsena-go/path-helpers"
 )
 
 var log = defaultlogger.NewLogger(path_helpers.GetCalledDir())
