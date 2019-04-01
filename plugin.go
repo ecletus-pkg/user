@@ -81,11 +81,15 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 			},
 		})
 
+		e.Admin.AddResource(&Group{}, &admin.Config{Setup: func(res *admin.Resource) {
+			p.groupSetup(res, options, n)
+		}, Menu: menu})
+
 	})
 
 	db.Events(p).DBOnMigrate(func(e *db.DBEvent) error {
 		return helpers.CheckReturnE(func() (key string, err error) {
-			return "Migrate", e.AutoMigrate(&User{}).Error
+			return "Migrate", e.AutoMigrate(&User{}, &Group{}, &UserGroup{}).Error
 		}, func() (key string, err error) {
 			return "Create Index", e.Model(&User{}).AddUniqueIndex("idx_user_name", "name").Error
 		})

@@ -18,3 +18,18 @@ SetPassword:
     YourPassword: Sua senha
     NewPassword: Nova senha
     PasswordConfirm: Confirme a nova senha
+
+Group:
+  label*:
+    s: Grupo
+    p: Grupos
+
+  attributes:
+    Name: Nome
+    Description: Descrição
+
+UserGroup:
+  Users:
+    label*:
+      s: Usuário
+      p: Usuários

@@ -76,7 +76,7 @@ type User struct {
 	RecoverToken       string
 	RecoverTokenExpiry *time.Time
 
-	systemAdmin   bool
+	systemAdmin bool
 
 	DefaultLocale string
 	Locales       []string
@@ -207,4 +207,27 @@ func (ur *UserRole) GetRoles() []string {
 		return []string{ur.Role}
 	}
 	return nil
+}
+
+type Group struct {
+	aorm.AuditedModel
+	aorm.VirtualFields
+
+	fragment.FragmentedModel
+
+	Name, Description string
+
+	Users []UserGroup `gorm:"foreignkey:GroupID"`
+}
+
+type UserGroup struct {
+	aorm.AuditedModel
+	UserID  string `gorm:"size:24;index;unique_index:ux_user_group"`
+	User    *User
+	GroupID string `gorm:"size:24;index;unique_index:ux_user_group"`
+	Group   *Group
+}
+
+func (UserGroup) GetGormInlinePreloadFields() []string {
+	return []string{"*", "User"}
 }

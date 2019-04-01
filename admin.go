@@ -4,6 +4,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ecletus/admin/admin_helpers"
+
 	"github.com/ecletus/core/resource"
 
 	"github.com/ecletus/admin"
@@ -82,7 +84,7 @@ func (p *Plugin) passwordSetup(r, res *admin.Resource, Notification *notificatio
 	menuEnabled := res.DefaultMenu().Enabled
 	res.DefaultMenu().Enabled = func(menu *admin.Menu, context *admin.Context) bool {
 		if user := context.CurrentUser(); user != nil {
-			return user.GetName() == "admin" && menuEnabled(menu, context)
+			return context.HasRole(admin.ROLE) && menuEnabled(menu, context)
 		}
 		return false
 	}
@@ -91,6 +93,32 @@ func (p *Plugin) passwordSetup(r, res *admin.Resource, Notification *notificatio
 	res.Meta(&admin.Meta{Name: "PasswordConfirm", Type: "password"})
 }
 
+func (p *Plugin) groupSetup(res *admin.Resource, options *plug.Options, Notification *notification.Notification) {
+	menuEnabled := res.DefaultMenu().Enabled
+	res.DefaultMenu().Enabled = func(menu *admin.Menu, context *admin.Context) bool {
+		if user := context.CurrentUser(); user != nil {
+			return context.HasRole(admin.ROLE) && (menuEnabled == nil || menuEnabled(menu, context))
+		}
+		return false
+	}
+	res.IndexAttrs("Name", "Description")
+	res.ShowAttrs("Name", "Description")
+	res.NewAttrs("Name", "Description")
+	res.EditAttrs(res.ShowAttrs())
+
+	res.AddResourceField("Users", nil, func(res *admin.Resource) {
+		admin_helpers.SelectOneOption(admin_helpers.SelectConfigOptionBottonSheet, res, "User")
+		res.IndexAttrs("User")
+		res.ShowAttrs("User")
+		res.NewAttrs("User")
+		res.EditAttrs(res.ShowAttrs())
+	})
+}
+
 func GetResource(Admin *admin.Admin) *admin.Resource {
 	return Admin.GetResourceByID("User")
+}
+
+func GetGroupResource(Admin *admin.Admin) *admin.Resource {
+	return Admin.GetResourceByID("Group")
 }
