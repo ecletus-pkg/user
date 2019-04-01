@@ -61,7 +61,7 @@ func (p *Plugin) userSetup(res *admin.Resource, options *plug.Options, Notificat
 		},
 	})
 
-	res.IndexAttrs("ID", "Email", "Name", "Role", "AdvancedRolesString")
+	res.IndexAttrs("Email", "Name", "Role", "AdvancedRolesString")
 	res.ShowAttrs(
 		&admin.Section{
 			Title: "Basic Information",

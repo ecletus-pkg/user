@@ -59,9 +59,7 @@ func (r AdvancedRoles) Strings() (names []string) {
 }
 
 type User struct {
-	aorm.AuditedModel
-	aorm.VirtualFields
-
+	aorm.AuditedSDModel
 	fragment.FragmentedModel
 
 	Email string `form:"email"`
@@ -173,13 +171,6 @@ func (user *User) Validate(db *aorm.DB) {
 	}
 }
 
-func (user *User) GetVirtualField(name string) (v interface{}, ok bool) {
-	if v, ok = user.VirtualFields.GetVirtualField(name); ok {
-		return
-	}
-	return user.FragmentedModel.GetVirtualField(name)
-}
-
 type AvatarImageStorage struct{ oss.OSS }
 
 func (AvatarImageStorage) GetSizes() map[string]*oss.Size {
@@ -211,8 +202,6 @@ func (ur *UserRole) GetRoles() []string {
 
 type Group struct {
 	aorm.AuditedModel
-	aorm.VirtualFields
-
 	fragment.FragmentedModel
 
 	Name, Description string
@@ -221,7 +210,8 @@ type Group struct {
 }
 
 type UserGroup struct {
-	aorm.AuditedModel
+	aorm.AuditedSDModel
+
 	UserID  string `gorm:"size:24;index;unique_index:ux_user_group"`
 	User    *User
 	GroupID string `gorm:"size:24;index;unique_index:ux_user_group"`
