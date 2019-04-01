@@ -114,26 +114,13 @@ func (p *Plugin) userSetup(res *admin.Resource, options *plug.Options, Notificat
 }
 
 func (p *Plugin) passwordSetup(r, res *admin.Resource, Notification *notification.Notification) {
-	menuEnabled := res.DefaultMenu().Enabled
-	res.DefaultMenu().Enabled = func(menu *admin.Menu, context *admin.Context) bool {
-		if user := context.CurrentUser(); user != nil {
-			return context.HasRole(admin.ROLE) && menuEnabled(menu, context)
-		}
-		return false
-	}
+	SetUserAdminMenuEnabled(res)
 	res.Meta(&admin.Meta{Name: "YourPassword", Type: "password"})
 	res.Meta(&admin.Meta{Name: "NewPassword", Type: "password"})
 	res.Meta(&admin.Meta{Name: "PasswordConfirm", Type: "password"})
 }
 
 func (p *Plugin) groupSetup(res *admin.Resource, options *plug.Options, Notification *notification.Notification) {
-	menuEnabled := res.DefaultMenu().Enabled
-	res.DefaultMenu().Enabled = func(menu *admin.Menu, context *admin.Context) bool {
-		if user := context.CurrentUser(); user != nil {
-			return context.HasRole(admin.ROLE) && (menuEnabled == nil || menuEnabled(menu, context))
-		}
-		return false
-	}
 	res.IndexAttrs("Name", "Description")
 	res.ShowAttrs("Name", "Description")
 	res.NewAttrs("Name", "Description")
@@ -146,6 +133,12 @@ func (p *Plugin) groupSetup(res *admin.Resource, options *plug.Options, Notifica
 		res.NewAttrs("User")
 		res.EditAttrs(res.ShowAttrs())
 	})
+
+	res.Permission = roles.NewPermission().
+		DenyAnother(roles.Create, p.Config.CreateRole).
+		DenyAnother(roles.Read, p.Config.ReadRole).
+		DenyAnother(roles.Update, p.Config.UpdateRole).
+		DenyAnother(roles.Delete, p.Config.DeleteRole)
 }
 
 func GetResource(Admin *admin.Admin) *admin.Resource {
@@ -154,4 +147,14 @@ func GetResource(Admin *admin.Admin) *admin.Resource {
 
 func GetGroupResource(Admin *admin.Admin) *admin.Resource {
 	return Admin.GetResourceByID("Group")
+}
+
+func SetUserAdminMenuEnabled(res *admin.Resource) {
+	menuEnabled := res.DefaultMenu().Enabled
+	res.DefaultMenu().Enabled = func(menu *admin.Menu, context *admin.Context) bool {
+		if user := context.CurrentUser(); user != nil {
+			return context.HasRole(admin.ROLE) && (menuEnabled == nil || menuEnabled(menu, context))
+		}
+		return false
+	}
 }
