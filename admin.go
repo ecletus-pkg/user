@@ -1,6 +1,7 @@
 package user
 
 import (
+	"net/http"
 	"sort"
 	"strings"
 
@@ -15,7 +16,7 @@ import (
 	"github.com/ecletus/roles"
 )
 
-func (p *Plugin) userSetup(res *admin.Resource, options *plug.Options, Notification *notification.Notification) {
+func (p *Plugin) userSetup(res *admin.Resource, options *plug.Options, Notification *notification.Notification, logouters *Logouters) {
 	rolesSlice := append([]string{}, options.GetStrings(p.RolesKey)...)
 	sort.Strings(rolesSlice)
 
@@ -78,6 +79,38 @@ func (p *Plugin) userSetup(res *admin.Resource, options *plug.Options, Notificat
 		DenyAnother(roles.Read, p.Config.ReadRole).
 		DenyAnother(roles.Update, p.Config.UpdateRole).
 		DenyAnother(roles.Delete, p.Config.DeleteRole)
+
+	res.Action(&admin.Action{
+		Name:   ActionLogout,
+		Method: http.MethodPost,
+		Type:   admin.ActionDanger,
+		Modes:  []string{"menu_item"},
+		Handler: func(argument *admin.ActionArgument) error {
+			for _, user := range argument.FindSelectedRecords() {
+				for _, logouter := range *logouters {
+					logouter.Logout(user, argument.Context)
+				}
+			}
+			return nil
+		},
+	})
+
+	if res.Controller.IsBulkDeleter() {
+		res.Action(&admin.Action{
+			Name:   ActionBulkLogout,
+			Method: http.MethodPost,
+			Type:   admin.ActionDanger,
+			Handler: func(argument *admin.ActionArgument) error {
+				for _, user := range argument.FindSelectedRecords() {
+					for _, logouter := range *logouters {
+						logouter.Logout(user, argument.Context)
+					}
+				}
+				return nil
+			},
+			Modes: []string{"index"},
+		})
+	}
 }
 
 func (p *Plugin) passwordSetup(r, res *admin.Resource, Notification *notification.Notification) {

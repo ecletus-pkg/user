@@ -24,7 +24,9 @@ import (
 )
 
 var (
-	USER_MENU = PKG + ".userMenu"
+	USER_MENU     = PKG + ".menu.user"
+	GROUP_MENU    = PKG + ".menu.group"
+	LOGOUTERS_KEY = PKG + ".logouters"
 )
 
 type Config struct {
@@ -38,8 +40,14 @@ type Plugin struct {
 	plug.EventDispatcher
 	db.DBNames
 	admin_plugin.AdminNames
-	SitesReaderKey, NotificationKey, AuthKey, RolesKey string
-	Config                                             Config
+
+	SitesReaderKey,
+	NotificationKey,
+	AuthKey,
+	RolesKey,
+	LogoutersKey string
+
+	Config Config
 }
 
 func (p *Plugin) OnRegister(options *plug.Options) {
@@ -48,6 +56,10 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 	}
 	if p.AuthKey == "" {
 		panic("AuthKey is BLANK")
+	}
+
+	if p.LogoutersKey == "" {
+		p.LogoutersKey = LOGOUTERS_KEY
 	}
 
 	if p.Config.CreateRole == "" {
@@ -66,11 +78,15 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 		p.Config.DeleteRole = admin.ROLE
 	}
 
+	var logouters Logouters
+
+	options.Set(p.LogoutersKey, &logouters)
+
 	admin_plugin.Events(p).InitResources(func(e *admin_plugin.AdminEvent) {
 		menu := options.GetStrings(USER_MENU)
 		n := options.GetInterface(p.NotificationKey).(*notification.Notification)
 		res := e.Admin.AddResource(&User{}, &admin.Config{Setup: func(res *admin.Resource) {
-			p.userSetup(res, options, n)
+			p.userSetup(res, options, n, &logouters)
 		}, Menu: menu})
 
 		res.AddResource(&admin.SubConfig{}, &SetPassword{}, &admin.Config{
@@ -81,10 +97,10 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 			},
 		})
 
+		gmenu := options.GetStrings(GROUP_MENU)
 		e.Admin.AddResource(&Group{}, &admin.Config{Setup: func(res *admin.Resource) {
 			p.groupSetup(res, options, n)
-		}, Menu: menu})
-
+		}, Menu: gmenu})
 	})
 
 	db.Events(p).DBOnMigrate(func(e *db.DBEvent) error {

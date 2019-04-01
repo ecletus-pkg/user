@@ -10,6 +10,10 @@ User:
   form:
     sections:
       Basic Information: Informações Básicas
+  actions:
+    Delete: Excluir
+    Bulk Delete: Excluir
+    Bulk Logout: Logout
 
 SetPassword:
   label*:
