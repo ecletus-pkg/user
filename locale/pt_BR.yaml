@@ -1,3 +1,6 @@
 set_password:
   unauthorized: "Você não possui privilégios para realizar esta operação."
   your_password_is_blank: "SUA SENHA está vazia."
+
+roles:
+  user_manager: Gerir usuários

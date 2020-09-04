@@ -14,6 +14,23 @@ User:
     Delete: Excluir
     Bulk Delete: Excluir
     Bulk Logout: Logout
+    Set Password: Definir/Alterar Senha
+
+  children:
+    AccessTokens*:
+      s: Chave de Acesso
+      p: Chaves de Acesso
+
+
+UserAuthAlias:
+  AuthAliases:
+    label*:
+      s: Alias de Autenticação
+      p: Aliases de Autenticação
+
+  attributes:
+    ID: Alias
+    Description: Descrição
 
 SetPassword:
   label*:
@@ -37,3 +54,15 @@ UserGroup:
     label*:
       s: Usuário
       p: Usuários
+
+AccessToken:
+  AccessTokens:
+    label*:
+      s: Chave de Acesso
+      p: Chaves de Acesso
+
+    attributes:
+      Name: Nome
+      Description: Descrição
+      ExpireAt: Expira em
+      Enabled: Habilitado

@@ -1,26 +1,17 @@
 package user
 
 import (
-	"fmt"
-	"syscall"
-
-	"github.com/moisespsena-go/aorm"
-
-	"github.com/ecletus-pkg/admin"
+	admin_plugin "github.com/ecletus-pkg/admin"
 	"github.com/ecletus/admin"
 	"github.com/ecletus/auth"
-	"github.com/ecletus/auth/auth_identity"
-	"github.com/ecletus/auth/providers/password"
+	"github.com/ecletus/auth/auth_identity/helpers"
 	"github.com/ecletus/cli"
 	"github.com/ecletus/core"
 	"github.com/ecletus/db"
-	"github.com/ecletus/helpers"
 	"github.com/ecletus/notification"
 	"github.com/ecletus/plug"
-	"github.com/ecletus/sites"
-	"github.com/moisespsena-go/error-wrap"
-	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
+	"github.com/moisespsena-go/aorm"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -30,10 +21,7 @@ var (
 )
 
 type Config struct {
-	CreateRole string
-	DeleteRole string
-	UpdateRole string
-	ReadRole   string
+	NotGroups  bool
 }
 
 type Plugin struct {
@@ -41,7 +29,7 @@ type Plugin struct {
 	db.DBNames
 	admin_plugin.AdminNames
 
-	SitesReaderKey,
+	SitesRegisterKey,
 	NotificationKey,
 	AuthKey,
 	RolesKey,
@@ -50,8 +38,15 @@ type Plugin struct {
 	Config Config
 }
 
+func (p *Plugin) RequireOptions() []string {
+	if p.NotificationKey != "" {
+		return []string{p.NotificationKey}
+	}
+	return nil
+}
+
 func (p *Plugin) OnRegister(options *plug.Options) {
-	if p.SitesReaderKey == "" {
+	if p.SitesRegisterKey == "" {
 		panic("SitesReaderKey is BLANK")
 	}
 	if p.AuthKey == "" {
@@ -62,133 +57,157 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 		p.LogoutersKey = LOGOUTERS_KEY
 	}
 
-	if p.Config.CreateRole == "" {
-		p.Config.CreateRole = admin.ROLE
-	}
-
-	if p.Config.ReadRole == "" {
-		p.Config.ReadRole = admin.ROLE
-	}
-
-	if p.Config.UpdateRole == "" {
-		p.Config.UpdateRole = admin.ROLE
-	}
-
-	if p.Config.DeleteRole == "" {
-		p.Config.DeleteRole = admin.ROLE
-	}
-
 	var logouters Logouters
 
 	options.Set(p.LogoutersKey, &logouters)
 
 	admin_plugin.Events(p).InitResources(func(e *admin_plugin.AdminEvent) {
 		menu := options.GetStrings(USER_MENU)
-		n := options.GetInterface(p.NotificationKey).(*notification.Notification)
-		res := e.Admin.AddResource(&User{}, &admin.Config{Setup: func(res *admin.Resource) {
-			p.userSetup(res, options, n, &logouters)
-		}, Menu: menu})
+		var Notification *notification.Notification
+		if p.NotificationKey != "" {
+			if ni := options.GetInterface(p.NotificationKey); ni != nil {
+				Notification = ni.(*notification.Notification)
+			}
+		}
 
-		res.AddResource(&admin.SubConfig{}, &SetPassword{}, &admin.Config{
-			Singleton:  true,
-			Controller: &SetPasswordController{res, n},
-			Setup: func(pres *admin.Resource) {
-				p.passwordSetup(res, pres, n)
+		e.Admin.OnPreInitializeMeta(func(meta *admin.Meta) {
+			if meta.Name == aorm.SoftDeleteFieldDeletedByID {
+				// TODO: implement it
+			}
+		})
+
+		res := e.Admin.AddResource(&User{}, &admin.Config{
+			Setup: func(res *admin.Resource) {
+				p.userSetup(res, options, Notification, &logouters)
+			},
+			Menu: menu,
+		})
+
+		Auth := options.GetInterface(p.AuthKey).(*auth.Auth)
+
+		res.AddResource(&admin.SubConfig{FieldName: "AccessTokens"}, nil, &admin.Config{
+			Setup: func(res *admin.Resource) {
+				res.NewAttrs("Name", "Description", "Enabled", "ExpireAt", "LimitAccess")
+				res.EditAttrs("Name", "Description", "Enabled", "ExpireAt", "LimitAccess")
+				res.ShowAttrs(res.EditAttrs(), "Token")
+				res.IndexAttrs(res.EditAttrs())
+				res.Meta(&admin.Meta{
+					Name: "Token",
+					Type: "text",
+					Config: &admin.TextConfig{
+						WordBreak: admin.WordBreakAll,
+						Copy:      true,
+					},
+					ReadOnly: true,
+				})
+
+				res.OnAfterDelete(func(ctx *core.Context, recorde interface{}) error {
+					uat := recorde.(*UserAccessToken)
+					if identity, err := helpers.GetIdentity(Auth.AuthIdentityModel, "user:access_tokens", ctx.DB().New(), uat.ID.String()); err == nil {
+						if err = helpers.DeleteIdentity(ctx.DB(), identity); err != nil {
+							return errors.Wrap(err, "Delete indentity")
+						}
+					}
+					return nil
+				})
+
+				var createOrUpdate = func(ctx *core.Context, recorde interface{}) error {
+					uat := recorde.(*UserAccessToken)
+					if uat.ID.IsZero() {
+						uat.ID.Generate()
+					}
+					if identity, err := helpers.GetIdentity(Auth.AuthIdentityModel, "user:access_tokens", ctx.DB().New(), uat.ID.String()); err == nil {
+						if uat.Enabled {
+							basic := identity.GetAuthBasic()
+							basic.UID = uat.ID.String()
+							basic.ExpireAt = uat.ExpireAt
+							basic.LimitAccess = uat.LimitAccess
+							identity.SetAuthBasic(*basic)
+							Claims := identity.GetAuthBasic().ToClaims()
+							if err = helpers.SaveIdentity(ctx.DB(), identity); err != nil {
+								return err
+							}
+							if token, err := Auth.SessionStorer.SignedToken(Claims); err != nil {
+								return err
+							} else {
+								recorde.(*UserAccessToken).Token = token
+							}
+						} else {
+							if err = helpers.DeleteIdentity(ctx.DB(), identity); err != nil {
+								return errors.Wrap(err, "Delete indentity")
+							}
+						}
+					} else if err == auth.ErrInvalidAccount {
+						if uat.Enabled {
+							identity = helpers.NewIdentity(Auth.AuthIdentityModel, "user:access_tokens")
+							basic := identity.GetAuthBasic()
+							basic.UID = uat.ID.String()
+							basic.ExpireAt = uat.ExpireAt
+							basic.UserID = uat.UserID.String()
+							basic.LimitAccess = uat.LimitAccess
+							identity.SetAuthBasic(*basic)
+							Claims := identity.GetAuthBasic().ToClaims()
+							if err = helpers.SaveIdentity(ctx.DB(), identity); err != nil {
+								return err
+							}
+							if token, err := Auth.SessionStorer.SignedToken(Claims); err != nil {
+								return err
+							} else {
+								recorde.(*UserAccessToken).Token = token
+							}
+						}
+					} else {
+						return err
+					}
+					return nil
+				}
+
+				res.OnBeforeCreate(createOrUpdate)
+				res.OnBeforeUpdate(func(ctx *core.Context, _, recorde interface{}) error {
+					return createOrUpdate(ctx, recorde)
+				})
 			},
 		})
 
-		gmenu := options.GetStrings(GROUP_MENU)
-		e.Admin.AddResource(&Group{}, &admin.Config{Setup: func(res *admin.Resource) {
-			p.groupSetup(res, options, n)
-		}, Menu: gmenu})
+		if !p.Config.NotGroups {
+			gmenu := options.GetStrings(GROUP_MENU)
+			e.Admin.AddResource(&Group{}, &admin.Config{Setup: func(res *admin.Resource) {
+				p.groupSetup(res, options, Notification)
+			}, Menu: gmenu})
+		}
 	})
 
 	db.Events(p).DBOnMigrate(func(e *db.DBEvent) error {
-		return helpers.CheckReturnE(func() (key string, err error) {
-			return "Migrate", e.AutoMigrate(&User{}, &Group{}, &UserGroup{}).Error
-		}, func() (key string, err error) {
-			return "Create Index", e.Model(&User{}).AddUniqueIndex("idx_user_name", "name").Error
-		})
+		var values = []interface{}{&User{}, &UserAuthAlias{}, &UserAccessToken{}}
+		if !p.Config.NotGroups {
+			values = append(values, &Group{}, &UserGroup{})
+		}
+		return e.AutoMigrate(values...).Error
 	})
+}
 
-	cli.OnRegister(p, func(e *cli.RegisterEvent) {
-		SitesReader := e.Options().GetInterface(p.SitesReaderKey).(core.SitesReaderInterface)
-		cmd := &sites.CmdUtils{SitesReader: SitesReader}
-		var rupCmd = cmd.Sites(&cobra.Command{
-			Use:   "user-password-reset NAME",
-			Short: "Reset the user password",
-			Args:  cobra.ExactArgs(1),
-		}, func(cmd *cobra.Command, site core.SiteInterface, args []string) (err error) {
-			name := args[0]
-			if name == "" {
-				return fmt.Errorf("User name is empty.")
-			}
+type CliPlugin struct {
+	plug.EventDispatcher
+	SitesRegisterKey,
+	AuthKey,
+	AdminGetterKey string
+	PreRun []func()
+}
 
-			Auth := options.GetInterface(p.AuthKey).(*auth.Auth)
-			DB := site.GetSystemDB().DB
-			log.Infof("Site %q: Redefinindo a senha do usuário %q.", site.Name(), name)
+func (p *CliPlugin) RequireOptions() []string {
+	return []string{p.AdminGetterKey}
+}
 
-			provider := Auth.GetProvider("password").(*password.Provider)
-
-			var user User
-			if err = DB.First(&user, "email = ?", name).Error; err != nil {
-				if aorm.IsRecordNotFoundError(err) {
-					return fmt.Errorf("User does not exists.")
-				}
-				return errwrap.Wrap(err, "Find user")
-			}
-
-			var (
-				passwd     string
-				readPasswd bool
-			)
-
-			if readPasswd, err = cmd.Flags().GetBool("read-password"); err != nil {
-				return fmt.Errorf("Read-Password flag failed.")
-			}
-			if readPasswd {
-				fmt.Print("Your password: ")
-				bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-				if err != nil {
-					return errwrap.Wrap(err, "Read Password")
-				}
-				passwd = string(bytePassword)
-				fmt.Println() // it's necessary to add a new line after user's input
-			} else {
-				if passwd, err = cmd.Flags().GetString("password"); err != nil {
-					return fmt.Errorf("Password flag failed.")
-				}
-			}
-
-			if passwd == "" {
-				return fmt.Errorf("Password is blank.")
-			}
-
-			updater := password.PasswordUpdater{
-				UID:                     user.GetEmail(),
-				UserID:                  user.GetID(),
-				Provider:                provider,
-				DB:                      DB,
-				NewPassword:             passwd,
-				PasswordConfirm:         passwd,
-				CurrentPasswordDisabled: true,
-				Confirmed:               true,
-				Createable:              true,
-				AuthIdentityModel:       &auth_identity.AuthIdentity{},
-				T: func(key string, defaul ...interface{}) string {
-					return key
-				},
-			}
-
-			if err = updater.Update(); err != nil {
-				return err
-			}
-			return nil
-		})
-
-		rupCmd.Flags().StringP("password", "p", "", "The new password")
-		rupCmd.Flags().BoolP("read-password", "P", false, "Read passsword from STDIN")
-
-		e.RootCmd.AddCommand(rupCmd)
+func (p *CliPlugin) OnRegister(options *plug.Options) {
+	cli.OnRegisterE(p, func(e *cli.RegisterEvent) error {
+		sitesRegister := e.Options().GetInterface(p.SitesRegisterKey).(*core.SitesRegister)
+		cmds, err := CreateCommands(sitesRegister, func() *auth.Auth {
+			return options.GetInterface(p.AuthKey).(*auth.Auth)
+		}, p.PreRun...)
+		if err != nil {
+			return err
+		}
+		e.RootCmd.AddCommand(cmds...)
+		return nil
 	})
 }

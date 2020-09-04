@@ -1,0 +1,2 @@
+errors:
+  user_does_not_have_mail_for_domain~: "Usúario não possui um endereço de e-mail ou alias de autenticação @{{.}}."

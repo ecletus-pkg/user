@@ -9,7 +9,7 @@ var E_REGISTER_USER = PKG + ".register_user"
 
 type RegisterUserEvent struct {
 	plug.PluginEventInterface
-	Site core.SiteInterface
+	Site *core.Site
 }
 
 type events struct {
@@ -34,6 +34,6 @@ func Trigger(d plug.PluginEventDispatcherInterface) *trigger {
 	return &trigger{d}
 }
 
-func (d *trigger) RegisterUsers(site core.SiteInterface) error {
+func (d *trigger) RegisterUsers(site *core.Site) error {
 	return d.d.Trigger(&RegisterUserEvent{plug.NewPluginEvent(E_REGISTER_USER + ":" + site.Name()), site})
 }

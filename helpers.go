@@ -1,8 +1,6 @@
 package user
 
 import (
-	"github.com/ecletus/common"
-
 	"github.com/ecletus/auth"
 	"github.com/ecletus/auth/auth_identity"
 	"github.com/ecletus/auth/providers/password"
@@ -10,17 +8,17 @@ import (
 	"github.com/ecletus/media/oss"
 	"github.com/ecletus/notification"
 	"github.com/moisespsena-go/aorm"
-	"github.com/moisespsena-go/default-logger"
-	"github.com/moisespsena-go/error-wrap"
-	"github.com/moisespsena-go/path-helpers"
+	defaultlogger "github.com/moisespsena-go/default-logger"
+	errwrap "github.com/moisespsena-go/error-wrap"
+	path_helpers "github.com/moisespsena-go/path-helpers"
 )
 
-var log = defaultlogger.NewLogger(path_helpers.GetCalledDir())
+var log = defaultlogger.GetOrCreateLogger(path_helpers.GetCalledDir())
 
 const DEFAULT_PASSWORD = "123@456"
 
-func SetUserPassword(DB *aorm.DB, Auth *auth.Auth, Notification *notification.Notification,
-	user common.User, passwd string, t ...func(key string, defaul ...interface{}) string) (err error) {
+func SetUserPassword(site *core.Site, DB *aorm.DB, Auth *auth.Auth, Notification *notification.Notification,
+	user auth.User, passwd string, t ...func(key string, defaul ...interface{}) string) (err error) {
 	var T func(key string, defaul ...interface{}) string
 	if len(t) > 0 && t[0] != nil {
 		T = t[0]
@@ -30,8 +28,8 @@ func SetUserPassword(DB *aorm.DB, Auth *auth.Auth, Notification *notification.No
 		}
 	}
 	updater := password.PasswordUpdater{
-		UID:                     user.GetEmail(),
-		UserID:                  user.GetID(),
+		UID:                     user.Schema().UID,
+		UserID:                  aorm.IdOf(user).String(),
 		Provider:                Auth.GetProvider("password").(*password.Provider),
 		DB:                      DB,
 		NewPassword:             passwd,
@@ -44,22 +42,24 @@ func SetUserPassword(DB *aorm.DB, Auth *auth.Auth, Notification *notification.No
 		T:                       T,
 	}
 
-	if err = updater.Update(); err != nil {
+	if err = updater.Update(Auth.NewContextFromSite(site)); err != nil {
 		return
 	}
 
-	// Send notification
-	_ = Notification.Send(&notification.Message{
-		From:        user,
-		To:          user,
-		Title:       T(auth.I18N_GROUP+".password_changed", "Password changed!"),
-		Body:        T(auth.I18N_GROUP+".you_password_changed", "You Password has be changed!"),
-		MessageType: "info",
-	}, &core.Context{DB: DB})
+	if Notification != nil {
+		// Send notification
+		_ = Notification.Send(&notification.Message{
+			From:        user,
+			To:          user,
+			Title:       T(auth.I18N_GROUP+".password_changed", "Password changed!"),
+			Body:        T(auth.I18N_GROUP+".you_password_changed", "You Password has be changed!"),
+			MessageType: "info",
+		}, (&core.Context{}).SetDB(DB))
+	}
 	return nil
 }
 
-func CreateAdminUserIfNotExists(site core.SiteInterface, Auth *auth.Auth, Notification *notification.Notification,
+func CreateAdminUserIfNotExists(site *core.Site, Auth *auth.Auth, Notification *notification.Notification,
 	readEmail func() (string, error), readPassword func() (string, error)) (err error) {
 	T := func(key string, defaul ...interface{}) string {
 		if len(defaul) > 0 {
@@ -71,10 +71,11 @@ func CreateAdminUserIfNotExists(site core.SiteInterface, Auth *auth.Auth, Notifi
 	}
 	var adminUser User
 	DB := oss.IgnoreCallback(site.GetSystemDB().DB)
-	if err = DB.First(&adminUser, "name = ?", "admin").Error; err != nil && aorm.IsRecordNotFoundError(err) {
+	if err = DB.First(&adminUser, "name = ?", AdminUserName).Error; aorm.IsRecordNotFoundError(err) {
 		log.Info("Create System Administrator user")
-		email, err := readEmail()
-		if err != nil {
+		var email string
+
+		if email, err = readEmail(); err != nil {
 			return errwrap.Wrap(err, "Read admin user mail")
 		}
 
@@ -97,8 +98,8 @@ func CreateAdminUserIfNotExists(site core.SiteInterface, Auth *auth.Auth, Notifi
 		}
 
 		updater := password.PasswordUpdater{
-			UID:                     email,
-			UserID:                  AdminUser.GetID(),
+			UID:                     AdminUser.GetUID(),
+			UserID:                  aorm.IdOf(AdminUser).String(),
 			Provider:                Auth.GetProvider("password").(*password.Provider),
 			DB:                      DB,
 			NewPassword:             passwd,
@@ -107,33 +108,36 @@ func CreateAdminUserIfNotExists(site core.SiteInterface, Auth *auth.Auth, Notifi
 			Confirmed:               true,
 			Createable:              true,
 			StrengthDisabled:        true,
+			IsAdmin:                 true,
 			AuthIdentityModel:       &auth_identity.AuthIdentity{},
 			T:                       T,
 		}
 
-		if err = updater.Update(); err != nil {
+		if err = updater.Update(Auth.NewContextFromSite(site)); err != nil {
 			return err
 		}
 
-		// Send notification
-		_ = Notification.Send(&notification.Message{
-			From:        AdminUser,
-			To:          AdminUser,
-			Title:       T(auth.I18N_GROUP+".password_changed", "Password changed!"),
-			Body:        T(auth.I18N_GROUP+".you_password_changed", "You Password has be changed!"),
-			MessageType: "info",
-		}, &core.Context{DB: DB})
+		if Notification != nil {
+			// Send notification
+			_ = Notification.Send(&notification.Message{
+				From:        AdminUser,
+				To:          AdminUser,
+				Title:       T(auth.I18N_GROUP+".password_changed", "Password changed!"),
+				Body:        T(auth.I18N_GROUP+".you_password_changed", "You Password has be changed!"),
+				MessageType: "info",
+			}, (&core.Context{}).SetDB(DB))
 
-		log.Infof("Admin User: name=admin, email=%q, password=%q", email, passwd)
+			log.Infof("Admin User: name=admin, email=%q, password=%q", email, passwd)
 
-		// Send welcome notification
-		return Notification.Send(&notification.Message{
-			From:        AdminUser,
-			To:          AdminUser,
-			Title:       "Welcome!",
-			Body:        "Welcome!",
-			MessageType: "info",
-		}, &core.Context{DB: DB})
+			// Send welcome notification
+			return Notification.Send(&notification.Message{
+				From:        AdminUser,
+				To:          AdminUser,
+				Title:       "Welcome!",
+				Body:        "Welcome!",
+				MessageType: "info",
+			}, (&core.Context{}).SetDB(DB))
+		}
 	}
 	return
 }
