@@ -2,6 +2,7 @@ package user
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/ecletus/admin"
 	"github.com/ecletus/auth"
@@ -20,6 +21,23 @@ func actionSetPassword(res *admin.Resource) {
 		Available: func(context *admin.Context) bool {
 			return true
 		},
+		SetupArgument: func(arg *admin.ActionArgument) (err error) {
+			var (
+				ctx        = arg.Context
+				sp         = arg.Argument.(*SetPassword)
+				targetUser User
+			)
+			if err = res.Crud(ctx.Context.CloneBasic()).FindOne(&targetUser, ctx.ResourceID); err != nil {
+				return err
+			}
+
+			if targetUser.IsSuper() && !arg.Context.CurrentUser().IsSuper() {
+				return auth.ErrUnauthorized
+			}
+
+			sp.targetUser = &targetUser
+			return
+		},
 		Handler: func(arg *admin.ActionArgument) (err error) {
 			var (
 				ctx       = arg.Context
@@ -36,14 +54,9 @@ func actionSetPassword(res *admin.Resource) {
 			if sp.NewPassword != sp.PasswordConfirm {
 				return errors.New(ctx.Ts(auth.I18n("passwords.passwords_not_match")))
 			}
-			var user User
-			if err = res.Crud(ctx.Context.CloneBasic()).FindOne(&user, ctx.ResourceID); err != nil {
-				return err
-			}
-
 			updater := password.PasswordUpdater{
-				UID:             user.GetUID(),
-				UserID:          aorm.IdOf(user).String(),
+				UID:             sp.targetUser.GetUID(),
+				UserID:          aorm.IdOf(sp.targetUser).String(),
 				Provider:        ctx.Admin.Auth.Auth().GetProvider("password").(*password.Provider),
 				DB:              ctx.DB(),
 				NewPassword:     sp.NewPassword,
@@ -69,4 +82,30 @@ type SetPassword struct {
 	YourPassword    string `admin:"required;type:password"`
 	NewPassword     string `admin:"required;type:password"`
 	PasswordConfirm string `admin:"required;type:password"`
+	targetUser      *User
+}
+
+func (SetPassword) AdminResourceSetup(res *admin.Resource, defaultSetup func()) {
+	defaultSetup()
+	res.Meta(&admin.Meta{
+		Name: "YourPassword",
+		RecordLabelFormatter: func(meta *admin.Meta, ctx *admin.Context, record interface{}, s string) string {
+			user := ctx.CurrentUser()
+			return strings.ReplaceAll(s, "%s", user.GetName()+" - "+user.DisplayName())
+		},
+	})
+
+	var newPassFmt = func(meta *admin.Meta, ctx *admin.Context, record interface{}, s string) string {
+		user := ctx.Result.(*admin.ActionArgument).Argument.(*SetPassword).targetUser
+		return strings.ReplaceAll(s, "%s", user.GetName()+" - "+user.DisplayName())
+	}
+
+	res.Meta(&admin.Meta{
+		Name:                 "NewPassword",
+		RecordLabelFormatter: newPassFmt,
+	})
+	res.Meta(&admin.Meta{
+		Name:                 "PasswordConfirm",
+		RecordLabelFormatter: newPassFmt,
+	})
 }

@@ -85,13 +85,6 @@ func (p *Plugin) userSetup(res *admin.Resource, options *plug.Options, Notificat
 	actionSetPassword(res)
 }
 
-func (p *Plugin) passwordSetup(r, res *admin.Resource, Notification *notification.Notification) {
-	SetUserAdminMenuEnabled(res)
-	res.Meta(&admin.Meta{Name: "YourPassword", Type: "password"})
-	res.Meta(&admin.Meta{Name: "NewPassword", Type: "password"})
-	res.Meta(&admin.Meta{Name: "PasswordConfirm", Type: "password"})
-}
-
 func (p *Plugin) groupSetup(res *admin.Resource, options *plug.Options, Notification *notification.Notification) {
 	res.IndexAttrs("Name", "Description")
 	res.ShowAttrs("Name", "Description")

@@ -2,16 +2,17 @@ package user
 
 import (
 	admin_plugin "github.com/ecletus-pkg/admin"
-	"github.com/ecletus/admin"
-	"github.com/ecletus/auth"
-	"github.com/ecletus/auth/auth_identity/helpers"
 	"github.com/ecletus/cli"
-	"github.com/ecletus/core"
 	"github.com/ecletus/db"
 	"github.com/ecletus/notification"
 	"github.com/ecletus/plug"
-	"github.com/moisespsena-go/aorm"
 	"github.com/pkg/errors"
+
+	"github.com/ecletus/admin"
+	"github.com/ecletus/auth"
+	"github.com/ecletus/auth/auth_identity/helpers"
+	"github.com/ecletus/core"
+	"github.com/moisespsena-go/aorm"
 )
 
 var (
@@ -21,7 +22,8 @@ var (
 )
 
 type Config struct {
-	NotGroups  bool
+	GroupsDisabled       bool
+	AccessTokensDisabled bool
 }
 
 type Plugin struct {
@@ -85,91 +87,100 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 
 		Auth := options.GetInterface(p.AuthKey).(*auth.Auth)
 
-		res.AddResource(&admin.SubConfig{FieldName: "AccessTokens"}, nil, &admin.Config{
-			Setup: func(res *admin.Resource) {
-				res.NewAttrs("Name", "Description", "Enabled", "ExpireAt", "LimitAccess")
-				res.EditAttrs("Name", "Description", "Enabled", "ExpireAt", "LimitAccess")
-				res.ShowAttrs(res.EditAttrs(), "Token")
-				res.IndexAttrs(res.EditAttrs())
-				res.Meta(&admin.Meta{
-					Name: "Token",
-					Type: "text",
-					Config: &admin.TextConfig{
-						WordBreak: admin.WordBreakAll,
-						Copy:      true,
-					},
-					ReadOnly: true,
-				})
+		if p.Config.AccessTokensDisabled {
+			res.Meta(&admin.Meta{
+				Name: "AccessTokens",
+				Enabled: func(recorde interface{}, context *admin.Context, meta *admin.Meta) bool {
+					return false
+				},
+			})
+		} else {
+			res.AddResource(&admin.SubConfig{FieldName: "AccessTokens"}, nil, &admin.Config{
+				Setup: func(res *admin.Resource) {
+					res.NewAttrs("Name", "Description", "Enabled", "ExpireAt", "LimitAccess")
+					res.EditAttrs("Name", "Description", "Enabled", "ExpireAt", "LimitAccess")
+					res.ShowAttrs(res.EditAttrs(), "Token")
+					res.IndexAttrs(res.EditAttrs())
+					res.Meta(&admin.Meta{
+						Name: "Token",
+						Type: "text",
+						Config: &admin.TextConfig{
+							WordBreak: admin.WordBreakAll,
+							Copy:      true,
+						},
+						ReadOnly: true,
+					})
 
-				res.OnAfterDelete(func(ctx *core.Context, recorde interface{}) error {
-					uat := recorde.(*UserAccessToken)
-					if identity, err := helpers.GetIdentity(Auth.AuthIdentityModel, "user:access_tokens", ctx.DB().New(), uat.ID.String()); err == nil {
-						if err = helpers.DeleteIdentity(ctx.DB(), identity); err != nil {
-							return errors.Wrap(err, "Delete indentity")
-						}
-					}
-					return nil
-				})
-
-				var createOrUpdate = func(ctx *core.Context, recorde interface{}) error {
-					uat := recorde.(*UserAccessToken)
-					if uat.ID.IsZero() {
-						uat.ID.Generate()
-					}
-					if identity, err := helpers.GetIdentity(Auth.AuthIdentityModel, "user:access_tokens", ctx.DB().New(), uat.ID.String()); err == nil {
-						if uat.Enabled {
-							basic := identity.GetAuthBasic()
-							basic.UID = uat.ID.String()
-							basic.ExpireAt = uat.ExpireAt
-							basic.LimitAccess = uat.LimitAccess
-							identity.SetAuthBasic(*basic)
-							Claims := identity.GetAuthBasic().ToClaims()
-							if err = helpers.SaveIdentity(ctx.DB(), identity); err != nil {
-								return err
-							}
-							if token, err := Auth.SessionStorer.SignedToken(Claims); err != nil {
-								return err
-							} else {
-								recorde.(*UserAccessToken).Token = token
-							}
-						} else {
+					res.OnAfterDelete(func(ctx *core.Context, recorde interface{}) error {
+						uat := recorde.(*UserAccessToken)
+						if identity, err := helpers.GetIdentity(Auth.AuthIdentityModel, "user:access_tokens", ctx.DB().New(), uat.ID.String()); err == nil {
 							if err = helpers.DeleteIdentity(ctx.DB(), identity); err != nil {
 								return errors.Wrap(err, "Delete indentity")
 							}
 						}
-					} else if err == auth.ErrInvalidAccount {
-						if uat.Enabled {
-							identity = helpers.NewIdentity(Auth.AuthIdentityModel, "user:access_tokens")
-							basic := identity.GetAuthBasic()
-							basic.UID = uat.ID.String()
-							basic.ExpireAt = uat.ExpireAt
-							basic.UserID = uat.UserID.String()
-							basic.LimitAccess = uat.LimitAccess
-							identity.SetAuthBasic(*basic)
-							Claims := identity.GetAuthBasic().ToClaims()
-							if err = helpers.SaveIdentity(ctx.DB(), identity); err != nil {
-								return err
-							}
-							if token, err := Auth.SessionStorer.SignedToken(Claims); err != nil {
-								return err
-							} else {
-								recorde.(*UserAccessToken).Token = token
-							}
+						return nil
+					})
+
+					var createOrUpdate = func(ctx *core.Context, recorde interface{}) error {
+						uat := recorde.(*UserAccessToken)
+						if uat.ID.IsZero() {
+							uat.ID.Generate()
 						}
-					} else {
-						return err
+						if identity, err := helpers.GetIdentity(Auth.AuthIdentityModel, "user:access_tokens", ctx.DB().New(), uat.ID.String()); err == nil {
+							if uat.Enabled {
+								basic := identity.GetAuthBasic()
+								basic.UID = uat.ID.String()
+								basic.ExpireAt = uat.ExpireAt
+								basic.LimitAccess = uat.LimitAccess
+								identity.SetAuthBasic(*basic)
+								Claims := identity.GetAuthBasic().ToClaims()
+								if err = helpers.SaveIdentity(ctx.DB(), identity); err != nil {
+									return err
+								}
+								if token, err := Auth.SessionStorer.SignedToken(Claims); err != nil {
+									return err
+								} else {
+									recorde.(*UserAccessToken).Token = token
+								}
+							} else {
+								if err = helpers.DeleteIdentity(ctx.DB(), identity); err != nil {
+									return errors.Wrap(err, "Delete indentity")
+								}
+							}
+						} else if err == auth.ErrInvalidAccount {
+							if uat.Enabled {
+								identity = helpers.NewIdentity(Auth.AuthIdentityModel, "user:access_tokens")
+								basic := identity.GetAuthBasic()
+								basic.UID = uat.ID.String()
+								basic.ExpireAt = uat.ExpireAt
+								basic.UserID = uat.UserID.String()
+								basic.LimitAccess = uat.LimitAccess
+								identity.SetAuthBasic(*basic)
+								Claims := identity.GetAuthBasic().ToClaims()
+								if err = helpers.SaveIdentity(ctx.DB(), identity); err != nil {
+									return err
+								}
+								if token, err := Auth.SessionStorer.SignedToken(Claims); err != nil {
+									return err
+								} else {
+									recorde.(*UserAccessToken).Token = token
+								}
+							}
+						} else {
+							return err
+						}
+						return nil
 					}
-					return nil
-				}
 
-				res.OnBeforeCreate(createOrUpdate)
-				res.OnBeforeUpdate(func(ctx *core.Context, _, recorde interface{}) error {
-					return createOrUpdate(ctx, recorde)
-				})
-			},
-		})
+					res.OnBeforeCreate(createOrUpdate)
+					res.OnBeforeUpdate(func(ctx *core.Context, _, recorde interface{}) error {
+						return createOrUpdate(ctx, recorde)
+					})
+				},
+			})
+		}
 
-		if !p.Config.NotGroups {
+		if !p.Config.GroupsDisabled {
 			gmenu := options.GetStrings(GROUP_MENU)
 			e.Admin.AddResource(&Group{}, &admin.Config{Setup: func(res *admin.Resource) {
 				p.groupSetup(res, options, Notification)
@@ -179,7 +190,7 @@ func (p *Plugin) OnRegister(options *plug.Options) {
 
 	db.Events(p).DBOnMigrate(func(e *db.DBEvent) error {
 		var values = []interface{}{&User{}, &UserAuthAlias{}, &UserAccessToken{}}
-		if !p.Config.NotGroups {
+		if !p.Config.GroupsDisabled {
 			values = append(values, &Group{}, &UserGroup{})
 		}
 		return e.AutoMigrate(values...).Error

@@ -36,10 +36,9 @@ SetPassword:
   label*:
     s: Alterar Senha
   attributes:
-    YourPassword: Sua senha
-    NewPassword: Nova senha
-    PasswordConfirm: Confirme a nova senha
-
+    YourPassword: Senha do usuário logado «%s»
+    NewPassword: Nova senha para «%s»
+    PasswordConfirm: Confirme a nova senha para «%s»
 Group:
   label*:
     s: Grupo

@@ -15,7 +15,7 @@ func RoleUserManager() string {
 }
 
 func init() {
-	roles.Register(roles.NewDescriptor(roleUserManager, EqualsRoleChecker(roleUserManager), i18nmod.Cached(i18ng+".roles.user_manager")))
+	RegisterRole(roleUserManager, i18ng+".roles.user_manager")
 }
 
 func EqualsRoleChecker(roleName string) roles.Checker {
@@ -25,4 +25,8 @@ func EqualsRoleChecker(roleName string) roles.Checker {
 		}
 		return false
 	}
+}
+
+func RegisterRole(name, label string) {
+	roles.Register(roles.NewDescriptor(name, EqualsRoleChecker(name), i18nmod.Cached(label)))
 }
